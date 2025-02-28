@@ -1,0 +1,86 @@
+/* Simulations.css */
+.simulations-container {
+  margin: 20px;
+  background: var(--background);;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.simulations-container h2 {
+  margin-bottom: 10px;
+}
+
+.simulations-container h3 {
+  margin: 10px 0;
+}
+
+.simulation-section:not(:has(.upload-card)) {
+  visibility: hidden;
+  height: 1px;
+}
+
+.upload-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 10px 10vw;
+  height: 10vh;
+  cursor: pointer;
+  background: var(--element-foreground);
+  font-weight: 800;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.simResult {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 10px;
+  background: var(--element-foreground);
+  padding: 10px;
+  border: 1px solid #ddd;
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+  border-radius: 8px;
+}
+
+.canvasItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 10px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  background: var(--element-foreground);
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+  border-radius: 8px;
+}
+
+canvas {
+  max-height: 200px;
+  width: auto;
+  height: auto;
+}
+
+.type-label {
+  margin-top: 10px;
+}
+
+.simulation-section:not(:has(.upload-card)).photo__rendered {
+  visibility: visible;
+  height: unset;
+}
+
+.app-container.dark .upload-card, .app-container.dark .simResult, .app-container.dark .canvasItem, .app-container.dark .simulations-container {
+  background: var(--dark-background);
+}

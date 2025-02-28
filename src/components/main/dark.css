@@ -1,0 +1,13 @@
+.app-container.dark .dark-mode-toggle,
+.app-container.dark footer {
+  border-color: var(--dark-foreground);
+  color: var(--dark-foreground);
+}
+
+.app-container.dark footer {
+  background-color: transparent;
+}
+
+.app-container.dark .card {
+  border-color: #444;
+}
