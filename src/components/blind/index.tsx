@@ -59,7 +59,7 @@
 */
 
 // Blind.js
-import React, { useRef, ChangeEvent, useState } from "react";
+import React, { useRef, ChangeEvent, useState, useEffect } from "react";
 import "./index.css";
 
 const colorBlindSimulations = [
@@ -493,6 +493,11 @@ function Simulations() {
   };
 
   const processFile = (file: Blob) => {
+    // Prevent any potential navigation/refresh
+    if (typeof window !== 'undefined') {
+      window.onbeforeunload = null;
+    }
+    
     setError(null);
     setDebugInfo([]);
     
@@ -590,11 +595,17 @@ function Simulations() {
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (e.target.files && e.target.files[0]) {
       setLoading(true);
       setRendered(false);
       processFile(e.target.files[0]);
     }
+    
+    // Reset the input value to allow re-uploading the same file
+    e.target.value = '';
   };
   
   const clearError = () => {
@@ -602,24 +613,58 @@ function Simulations() {
     setDebugInfo([]);
   };
 
-  const handleCardClick = () => {
-    if (fileInputRef.current) fileInputRef.current.click();
+  // Prevent page refresh on file operations
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (loading) {
+        e.preventDefault();
+        return '';
+      }
+    };
+
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Prevent Enter key from submitting any forms
+      if (e.key === 'Enter' && (e.target as HTMLElement)?.tagName === 'INPUT') {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('keypress', handleKeyPress);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('keypress', handleKeyPress);
+    };
+  }, [loading]);
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (fileInputRef.current && !loading) {
+      fileInputRef.current.click();
+    }
   };
 
   return (
     <div className={`simulation`}>
-      <div
-        className={`upload-card ${loading ? "upload-card__loading" : ""}`}
-        onClick={handleCardClick}>
-        <input
-          type="file"
-          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp,image/svg+xml"
-          ref={fileInputRef}
-          style={{ display: "none" }}
-          disabled={loading}
-          onChange={handleFileChange}
-        />
-        <p>{loading ? "Loading..." : "Upload a photo or design screenshot here"}</p>
+      {/* File input wrapper to prevent form submission */}
+      <div className="file-input-wrapper" onSubmit={(e) => e.preventDefault()}>
+        <div
+          className={`upload-card ${loading ? "upload-card__loading" : ""}`}
+          onClick={handleCardClick}>
+          <input
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp,image/svg+xml"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            disabled={loading}
+            onChange={handleFileChange}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <p>{loading ? "Loading..." : "Upload a photo or design screenshot here"}</p>
+        </div>
       </div>
       
       {/* Error Message */}
@@ -629,7 +674,17 @@ function Simulations() {
             <h4>⚠️ Upload Error</h4>
             <p>{error}</p>
             <div className="error-actions">
-              <button onClick={clearError} className="error-button">Try Again</button>
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  clearError();
+                }} 
+                className="error-button"
+                type="button"
+              >
+                Try Again
+              </button>
             </div>
             <details className="debug-details">
               <summary>Debug Information</summary>
