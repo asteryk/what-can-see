@@ -96,14 +96,14 @@ const colorBlindSimulations = [
     label: "Tritanomaly",
     type: "tritan",
     anomalize: true,
-    blinder: { x: 0.1748, y: 0.0, m: 0.062921, yi: 0.292119 },
+    blinder: { x: 0.171, y: -0.003, m: 0.062921, yi: 0.292120 },
   },
   {
     id: "cb-canvasTritanopia",
     label: "Tritanopia",
     type: "tritan",
     anomalize: false,
-    blinder: { x: 0.1748, y: 0.0, m: 0.062921, yi: 0.292119 },
+    blinder: { x: 0.171, y: -0.003, m: 0.062921, yi: 0.292120 },
   },
   {
     id: "cb-canvasAchromatomaly",
@@ -144,14 +144,14 @@ const fragmentShaderSourceCB = `
   varying vec2 v_texCoord;
 
   const mat3 matrixRgbXyz = mat3(
-    0.41242371206635076, 0.3575793401363035, 0.1804662232369621,
-    0.21265606784927693, 0.715157818248362, 0.0721864539171564,
-    0.019331987577444885, 0.11919267420354762, 0.9504491124870351
+    0.4306, 0.3416, 0.1783,
+    0.2220, 0.7067, 0.0713,
+    0.0202, 0.1296, 0.9392
   );
   const mat3 matrixXyzRgb = mat3(
-    3.240712470389558, -1.5372626602963142, -0.49857440415943116,
-    -0.969259258688888, 1.875996969313966, 0.041556132211625726,
-    0.05563600315398933, -0.2039948802843549, 1.0570636917433989
+    3.0632, -1.3933, -0.4758,
+    -0.9692, 1.8760, 0.0416,
+    0.0679, -0.2289, 1.0693
   );
 
   vec3 toLinear(vec3 c) {
@@ -178,19 +178,24 @@ const fragmentShaderSourceCB = `
   }
   void main(){
     vec4 texColor = texture2D(u_image, v_texCoord);
-    vec3 c = toLinear(texColor.rgb);
+    vec3 c = pow(texColor.rgb, vec3(u_gamma));
     if(u_achroma) {
       float gray = dot(c, vec3(0.212656, 0.715158, 0.072186));
       vec3 result = vec3(gray);
       if(u_anomalize) {
         result = (1.75 * result + c) / 2.75;
       }
-      gl_FragColor = vec4(toSrgb(result), texColor.a);
+      gl_FragColor = vec4(result, texColor.a);
       return;
     }
     vec3 xyz = rgbToXyz(c);
     vec3 xyy = xyzToXyy(xyz);
-    float slope = (xyy.y - u_blinder.y) / (xyy.x - u_blinder.x);
+    float slope;
+    if (xyy.x < u_blinder.x) {
+        slope = (u_blinder.y - xyy.y) / (u_blinder.x - xyy.x);
+    } else {
+        slope = (xyy.y - u_blinder.y) / (xyy.x - u_blinder.x);
+    }
     float yi = xyy.y - xyy.x * slope;
     float dx = (u_blinder.w - yi) / (slope - u_blinder.z);
     float dy = slope * dx + yi;
@@ -209,9 +214,9 @@ const fragmentShaderSourceCB = `
     simRGB.r = simX * matrixXyzRgb[0][0] + simY * matrixXyzRgb[0][1] + simZ * matrixXyzRgb[0][2];
     simRGB.g = simX * matrixXyzRgb[1][0] + simY * matrixXyzRgb[1][1] + simZ * matrixXyzRgb[1][2];
     simRGB.b = simX * matrixXyzRgb[2][0] + simY * matrixXyzRgb[2][1] + simZ * matrixXyzRgb[2][2];
-    float _r = ((simRGB.r < 0.0 ? 0.0 : 1.0) - simRGB.r) / dRGB.r;
-    float _g = ((simRGB.g < 0.0 ? 0.0 : 1.0) - simRGB.g) / dRGB.g;
-    float _b = ((simRGB.b < 0.0 ? 0.0 : 1.0) - simRGB.b) / dRGB.b;
+    float _r = (dRGB.r != 0.0) ? ((simRGB.r < 0.0 ? 0.0 : 1.0) - simRGB.r) / dRGB.r : 0.0;
+    float _g = (dRGB.g != 0.0) ? ((simRGB.g < 0.0 ? 0.0 : 1.0) - simRGB.g) / dRGB.g : 0.0;
+    float _b = (dRGB.b != 0.0) ? ((simRGB.b < 0.0 ? 0.0 : 1.0) - simRGB.b) / dRGB.b : 0.0;
     _r = (_r > 1.0 || _r < 0.0) ? 0.0 : _r;
     _g = (_g > 1.0 || _g < 0.0) ? 0.0 : _g;
     _b = (_b > 1.0 || _b < 0.0) ? 0.0 : _b;
@@ -222,7 +227,7 @@ const fragmentShaderSourceCB = `
     if(u_anomalize) {
       simRGB = (1.75 * simRGB + c) / 2.75;
     }
-    gl_FragColor = vec4(toSrgb(simRGB), texColor.a);
+    gl_FragColor = vec4(clamp(simRGB, 0.0, 1.0), texColor.a);
   }
 `;
 
