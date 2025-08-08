@@ -84,3 +84,137 @@ canvas {
 .app-container.dark .upload-card, .app-container.dark .simResult, .app-container.dark .canvasItem, .app-container.dark .simulations-container {
   background: var(--dark-background);
 }
+
+/* Error Message Styles */
+.error-message {
+  margin: 20px 10vw;
+  padding: 0;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.15);
+  background: #f8d7da;
+  border: 1px solid #f5c2c7;
+  animation: slideDown 0.3s ease-out;
+}
+
+.error-content {
+  padding: 20px;
+}
+
+.error-message h4 {
+  color: #842029;
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.error-message p {
+  color: #721c24;
+  margin: 0 0 15px 0;
+  line-height: 1.5;
+}
+
+.error-actions {
+  margin: 15px 0 10px 0;
+}
+
+.error-button {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.error-button:hover {
+  background: #bb2d3b;
+}
+
+.debug-details {
+  margin-top: 15px;
+  border-top: 1px solid #f1aeb5;
+  padding-top: 15px;
+}
+
+.debug-details summary {
+  cursor: pointer;
+  color: #6f2832;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.debug-details summary:hover {
+  color: #842029;
+}
+
+.debug-info {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.debug-line {
+  margin: 2px 0;
+  color: #495057;
+}
+
+.debug-line:nth-child(odd) {
+  background-color: #f8f9fa;
+}
+
+/* Dark mode styles for error messages */
+.app-container.dark .error-message {
+  background: #2d1b1e;
+  border-color: #5a2a2d;
+}
+
+.app-container.dark .error-message h4 {
+  color: #f8d7da;
+}
+
+.app-container.dark .error-message p {
+  color: #e2b4b7;
+}
+
+.app-container.dark .debug-details {
+  border-top-color: #5a2a2d;
+}
+
+.app-container.dark .debug-details summary {
+  color: #d1b3b6;
+}
+
+.app-container.dark .debug-details summary:hover {
+  color: #f8d7da;
+}
+
+.app-container.dark .debug-info {
+  background: #1a1a1a;
+  border-color: #4a4a4a;
+}
+
+.app-container.dark .debug-line {
+  color: #adb5bd;
+}
+
+.app-container.dark .debug-line:nth-child(odd) {
+  background-color: #2d2d2d;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

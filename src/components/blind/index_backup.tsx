@@ -485,108 +485,36 @@ function Simulations() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [rendered, setRendered] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
-
-  const addDebugInfo = (info: string) => {
-    setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${info}`]);
-  };
 
   const processFile = (file: Blob) => {
-    setError(null);
-    setDebugInfo([]);
-    
-    addDebugInfo(`File selected: ${(file as File).name || 'unknown'}`);
-    addDebugInfo(`File type: ${file.type || 'unknown'}`);
-    addDebugInfo(`File size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-    
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      setError(`Unsupported file type: ${file.type}. Please use JPG, PNG, or other standard image formats.`);
-      setLoading(false);
-      return;
-    }
-    
-    // Check file size (limit to 50MB)
-    if (file.size > 50 * 1024 * 1024) {
-      setError('File too large. Please use an image smaller than 50MB.');
-      setLoading(false);
-      return;
-    }
-    
     const reader = new FileReader();
-    
-    reader.onerror = () => {
-      addDebugInfo('FileReader error occurred');
-      setError('Failed to read the image file. Please try a different image.');
-      setLoading(false);
-    };
-    
     reader.onload = (evt) => {
-      addDebugInfo('File read successfully');
       const img = new Image();
-      
-      img.onerror = () => {
-        addDebugInfo('Image loading failed');
-        setError('Failed to load the image. The file might be corrupted or in an unsupported format.');
-        setLoading(false);
-      };
-      
       img.onload = () => {
-        addDebugInfo(`Image loaded: ${img.width}x${img.height}`);
-        
-        try {
-          // colorBlindSimulations
-          colorBlindSimulations.forEach((sim) => {
-            const canvas = document.getElementById(sim.id) as HTMLCanvasElement;
-            if (canvas) {
-              try {
-                initColorBlindGL(canvas, sim, img);
-                addDebugInfo(`Color blind simulation ${sim.label} rendered`);
-              } catch (err) {
-                addDebugInfo(`Error in ${sim.label}: ${err}`);
-                console.error(`Error in color blind simulation ${sim.label}:`, err);
-              }
-            }
-          });
-          
-          // visualEffects
-          visualEffects.forEach((effect) => {
-            const canvas = document.getElementById(effect.id) as HTMLCanvasElement;
-            if (canvas) {
-              try {
-                initVIWebGL(canvas, effect.effect, img);
-                addDebugInfo(`Visual effect ${effect.label} rendered`);
-              } catch (err) {
-                addDebugInfo(`Error in ${effect.label}: ${err}`);
-                console.error(`Error in visual effect ${effect.label}:`, err);
-              }
-            }
-          });
-          
-          addDebugInfo('All simulations completed successfully');
-          setRendered(true);
-        } catch (err) {
-          addDebugInfo(`General rendering error: ${err}`);
-          setError('Failed to process the image. Your device might not support the required features.');
-          console.error('Processing error:', err);
-        }
-        
-        setLoading(false);
+        // colorBlindSimulations
+        colorBlindSimulations.forEach((sim) => {
+          const canvas = document.getElementById(sim.id) as HTMLCanvasElement;
+          if (canvas) initColorBlindGL(canvas, sim, img);
+        });
+        // visualEffects
+        visualEffects.forEach((effect) => {
+          const canvas = document.getElementById(
+            effect.id
+          ) as HTMLCanvasElement;
+          if (canvas) initVIWebGL(canvas, effect.effect, img);
+        });
       };
-      
       if (!!evt?.target?.result) {
-        addDebugInfo('Setting image source');
         img.src = evt.target.result as string;
       } else {
-        addDebugInfo('No result from FileReader');
-        setError('Failed to read the image data.');
-        setLoading(false);
+        img.src = "";
       }
     };
-    
-    addDebugInfo('Starting to read file as data URL');
     reader.readAsDataURL(file);
+    reader.onloadend = () => {
+      setLoading(false);
+      setRendered(true);
+    };
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -595,11 +523,6 @@ function Simulations() {
       setRendered(false);
       processFile(e.target.files[0]);
     }
-  };
-  
-  const clearError = () => {
-    setError(null);
-    setDebugInfo([]);
   };
 
   const handleCardClick = () => {
@@ -613,7 +536,7 @@ function Simulations() {
         onClick={handleCardClick}>
         <input
           type="file"
-          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp,image/svg+xml"
+          accept="image/*"
           ref={fileInputRef}
           style={{ display: "none" }}
           disabled={loading}
@@ -621,27 +544,6 @@ function Simulations() {
         />
         <p>{loading ? "Loading..." : "Upload a photo or design screenshot here"}</p>
       </div>
-      
-      {/* Error Message */}
-      {error && (
-        <div className="error-message">
-          <div className="error-content">
-            <h4>⚠️ Upload Error</h4>
-            <p>{error}</p>
-            <div className="error-actions">
-              <button onClick={clearError} className="error-button">Try Again</button>
-            </div>
-            <details className="debug-details">
-              <summary>Debug Information</summary>
-              <div className="debug-info">
-                {debugInfo.map((info, index) => (
-                  <div key={index} className="debug-line">{info}</div>
-                ))}
-              </div>
-            </details>
-          </div>
-        </div>
-      )}
       {/* Vision Impairment */}
       <div className={`simulation-section ${rendered? 'photo__rendered': ''}`}>
         <h3>Vision Impairment</h3>
