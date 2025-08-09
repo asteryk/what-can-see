@@ -256,11 +256,30 @@ function initColorBlindGL(
       },
   image: HTMLImageElement
 ) {
-  const gl = canvas.getContext("webgl");
+  const gl = canvas.getContext("webgl", {
+    preserveDrawingBuffer: true,
+    antialias: false,
+    powerPreference: "high-performance"
+  });
   if (!gl) {
     console.error("WebGL Not Support");
-    return;
+    throw new Error("WebGL not supported");
   }
+
+  // Add context loss event listeners
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    console.log('WebGL context lost for canvas:', canvas.id);
+  }, false);
+
+  canvas.addEventListener('webglcontextrestored', () => {
+    console.log('WebGL context restored for canvas:', canvas.id);
+    try {
+      initColorBlindGL(canvas, simSetting, image);
+    } catch (err) {
+      console.error(`Failed to restore WebGL context:`, err);
+    }
+  }, false);
   canvas.width = image.width;
   canvas.height = image.height;
   gl.viewport(0, 0, canvas.width, canvas.height);
@@ -407,12 +426,30 @@ function initVIWebGL(
   effectNum: number,
   image: HTMLImageElement
 ) {
-  const gl = canvas.getContext("webgl");
+  const gl = canvas.getContext("webgl", {
+    preserveDrawingBuffer: true,
+    antialias: false,
+    powerPreference: "high-performance"
+  });
   if (!gl) {
     console.error("WebGL Unsupported");
-    alert("WebGL Unsupported");
-    return;
+    throw new Error("WebGL not supported for visual effects");
   }
+
+  // Add context loss event listeners
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    console.log('WebGL context lost for visual effect canvas:', canvas.id);
+  }, false);
+
+  canvas.addEventListener('webglcontextrestored', () => {
+    console.log('WebGL context restored for visual effect canvas:', canvas.id);
+    try {
+      initVIWebGL(canvas, effectNum, image);
+    } catch (err) {
+      console.error(`Failed to restore WebGL context for visual effects:`, err);
+    }
+  }, false);
   canvas.width = image.width;
   canvas.height = image.height;
   gl.viewport(0, 0, canvas.width, canvas.height);
@@ -497,7 +534,61 @@ function Simulations() {
     setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${info}`]);
   };
 
-  const processFile = (file: Blob) => {
+  const setMobileError = (message: string) => {
+    setError(`📱 Mobile Issue: ${message}`);
+    addDebugInfo(`Mobile error: ${message}`);
+  };
+
+  const setWebGLError = (message: string) => {
+    setError(`🎨 Graphics Error: ${message}`);
+    addDebugInfo(`WebGL error: ${message}`);
+  };
+
+  const setFileError = (message: string) => {
+    setError(`📄 File Error: ${message}`);
+    addDebugInfo(`File error: ${message}`);
+  };
+
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  const resizeImageIfNeeded = (file: Blob): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDimension = isMobileDevice() ? 1920 : 2560;
+        
+        if (img.width <= maxDimension && img.height <= maxDimension) {
+          resolve(file);
+          return;
+        }
+
+        addDebugInfo(`Resizing image from ${img.width}x${img.height} to fit ${maxDimension}px`);
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        
+        const scale = Math.min(maxDimension / img.width, maxDimension / img.height);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        canvas.toBlob((blob) => {
+          resolve(blob || file);
+        }, 'image/jpeg', 0.9);
+      };
+      
+      img.onerror = () => {
+        resolve(file); // Return original if can't load for resizing
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const processFile = async (file: Blob) => {
     // Prevent any potential navigation/refresh
     if (typeof window !== 'undefined') {
       window.onbeforeunload = null;
@@ -512,23 +603,44 @@ function Simulations() {
     
     // Check file type
     if (!file.type.startsWith('image/')) {
-      setError(`Unsupported file type: ${file.type}. Please use JPG, PNG, or other standard image formats.`);
+      setFileError(`Unsupported file type: ${file.type}. Please use JPG, PNG, or other standard image formats.`);
       setLoading(false);
       return;
     }
     
-    // Check file size (limit to 50MB)
-    if (file.size > 50 * 1024 * 1024) {
-      setError('File too large. Please use an image smaller than 50MB.');
+    // Enhanced mobile file size check
+    const maxSize = isMobileDevice() ? 15 * 1024 * 1024 : 50 * 1024 * 1024; // 15MB mobile, 50MB desktop
+    if (file.size > maxSize) {
+      const maxSizeMB = isMobileDevice() ? 15 : 50;
+      if (isMobileDevice()) {
+        setMobileError(`File too large for mobile device. Please use an image smaller than ${maxSizeMB}MB or try taking a photo with lower quality settings.`);
+      } else {
+        setFileError(`File too large. Please use an image smaller than ${maxSizeMB}MB.`);
+      }
       setLoading(false);
       return;
     }
-    
+
+    try {
+      // Resize image if needed
+      const processedFile = await resizeImageIfNeeded(file);
+      addDebugInfo(`Processed file size: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      
+      // Continue with file processing
+      processImageFile(processedFile);
+    } catch (err) {
+      addDebugInfo(`Error processing file: ${err}`);
+      setFileError('Failed to process the image file. Please try a different image.');
+      setLoading(false);
+    }
+  };
+
+  const processImageFile = (file: Blob) => {
     const reader = new FileReader();
     
     reader.onerror = () => {
       addDebugInfo('FileReader error occurred');
-      setError('Failed to read the image file. Please try a different image.');
+      setFileError('Failed to read the image file. Please try a different image.');
       setLoading(false);
     };
     
@@ -538,51 +650,13 @@ function Simulations() {
       
       img.onerror = () => {
         addDebugInfo('Image loading failed');
-        setError('Failed to load the image. The file might be corrupted or in an unsupported format.');
+        setFileError('Failed to load the image. The file might be corrupted or in an unsupported format.');
         setLoading(false);
       };
       
       img.onload = () => {
         addDebugInfo(`Image loaded: ${img.width}x${img.height}`);
-        
-        try {
-          // colorBlindSimulations
-          colorBlindSimulations.forEach((sim) => {
-            const canvas = document.getElementById(sim.id) as HTMLCanvasElement;
-            if (canvas) {
-              try {
-                initColorBlindGL(canvas, sim, img);
-                addDebugInfo(`Color blind simulation ${sim.label} rendered`);
-              } catch (err) {
-                addDebugInfo(`Error in ${sim.label}: ${err}`);
-                console.error(`Error in color blind simulation ${sim.label}:`, err);
-              }
-            }
-          });
-          
-          // visualEffects
-          visualEffects.forEach((effect) => {
-            const canvas = document.getElementById(effect.id) as HTMLCanvasElement;
-            if (canvas) {
-              try {
-                initVIWebGL(canvas, effect.effect, img);
-                addDebugInfo(`Visual effect ${effect.label} rendered`);
-              } catch (err) {
-                addDebugInfo(`Error in ${effect.label}: ${err}`);
-                console.error(`Error in visual effect ${effect.label}:`, err);
-              }
-            }
-          });
-          
-          addDebugInfo('All simulations completed successfully');
-          setRendered(true);
-        } catch (err) {
-          addDebugInfo(`General rendering error: ${err}`);
-          setError('Failed to process the image. Your device might not support the required features.');
-          console.error('Processing error:', err);
-        }
-        
-        setLoading(false);
+        processImageWithBatching(img);
       };
       
       if (!!evt?.target?.result) {
@@ -590,13 +664,78 @@ function Simulations() {
         img.src = evt.target.result as string;
       } else {
         addDebugInfo('No result from FileReader');
-        setError('Failed to read the image data.');
+        setFileError('Failed to read the image data.');
         setLoading(false);
       }
     };
     
     addDebugInfo('Starting to read file as data URL');
     reader.readAsDataURL(file);
+  };
+
+  const processImageWithBatching = async (img: HTMLImageElement) => {
+    try {
+      addDebugInfo('Starting batched image processing');
+      
+      // Create batches of simulations to prevent memory overload
+      const allSimulations = [
+        ...colorBlindSimulations.map(sim => ({ type: 'colorBlind' as const, config: sim })),
+        ...visualEffects.map(effect => ({ type: 'visualEffect' as const, config: effect }))
+      ];
+      
+      const batchSize = isMobileDevice() ? 2 : 4; // Smaller batches for mobile
+      addDebugInfo(`Processing ${allSimulations.length} simulations in batches of ${batchSize}`);
+      
+      for (let i = 0; i < allSimulations.length; i += batchSize) {
+        const batch = allSimulations.slice(i, i + batchSize);
+        
+        await Promise.allSettled(batch.map(async (simulation) => {
+          return new Promise<void>((resolve, reject) => {
+            setTimeout(() => {
+              try {
+                if (simulation.type === 'colorBlind') {
+                  const canvas = document.getElementById(simulation.config.id) as HTMLCanvasElement;
+                  if (canvas) {
+                    initColorBlindGL(canvas, simulation.config, img);
+                    addDebugInfo(`✓ ${simulation.config.label} rendered`);
+                  }
+                } else {
+                  const canvas = document.getElementById(simulation.config.id) as HTMLCanvasElement;
+                  if (canvas) {
+                    initVIWebGL(canvas, simulation.config.effect, img);
+                    addDebugInfo(`✓ ${simulation.config.label} rendered`);
+                  }
+                }
+                resolve();
+              } catch (err) {
+                addDebugInfo(`✗ Error in ${simulation.config.label}: ${err}`);
+                console.error(`Rendering error:`, err);
+                reject(err);
+              }
+            }, 50); // Small delay between renders
+          });
+        }));
+        
+        // Delay between batches to allow garbage collection
+        if (i + batchSize < allSimulations.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          addDebugInfo(`Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allSimulations.length / batchSize)} completed`);
+        }
+      }
+      
+      addDebugInfo('All simulations completed successfully');
+      setRendered(true);
+    } catch (err) {
+      addDebugInfo(`General rendering error: ${err}`);
+      if (isMobileDevice()) {
+        setMobileError('Failed to process the image. This might be due to device memory limitations. Try using a smaller image or refreshing the page.');
+      } else {
+        setWebGLError('Failed to process the image. Your device might not support the required graphics features or is running low on memory.');
+      }
+      console.error('Processing error:', err);
+    }
+    
+    setLoading(false);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -661,7 +800,8 @@ function Simulations() {
           onClick={handleCardClick}>
           <input
             type="file"
-            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp,image/svg+xml"
+            accept="image/*"
+            capture="environment"
             ref={fileInputRef}
             style={{ display: "none" }}
             disabled={loading}
