@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Script from "next/script";
 import Blind from "../blind";
 import "./index.css";
 import "./gradient-text.css";
@@ -15,30 +14,6 @@ function App() {
 
   return (
     <div className={`app-container ${isDarkMode ? "dark" : ""}`}>
-      <Script 
-        src="https://storage.ko-fi.com/cdn/scripts/overlay-widget.js"
-        strategy="afterInteractive"
-      />
-      <Script 
-        id="kofi-widget-init"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.addEventListener('load', function() {
-              if (typeof kofiWidgetOverlay !== 'undefined') {
-                kofiWidgetOverlay.draw('yorkl', {
-                  'type': 'floating-chat',
-                  'floating-chat.donateButton.text': 'Support Me',
-                  'floating-chat.donateButton.background-color': '#323842',
-                  'floating-chat.donateButton.text-color': '#fff'
-                });
-              } else {
-                console.warn('load script failed');
-              }
-            });
-          `
-        }}
-      />
       {/* header */}
       <header className="header" aria-label="header">
         <div className="logo" aria-label="logo">
