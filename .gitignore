@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# colorblind verification artifacts (reproducible / transient)
+/scripts/golden/
+/shader-output.json
+/after-fix-colorblind.png
+/.playwright-mcp/

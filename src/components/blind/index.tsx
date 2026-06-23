@@ -68,28 +68,28 @@ const colorBlindSimulations = [
     label: "Protanomaly",
     type: "protan",
     anomalize: true,
-    blinder: { x: 0.7465, y: 0.2535, m: 1.273463, yi: -0.073894 },
+    blinder: { x: 0.735, y: 0.265, m: 1.273463, yi: -0.073894 },
   },
   {
     id: "cb-canvasProtanopia",
     label: "Protanopia",
     type: "protan",
     anomalize: false,
-    blinder: { x: 0.7465, y: 0.2535, m: 1.273463, yi: -0.073894 },
+    blinder: { x: 0.735, y: 0.265, m: 1.273463, yi: -0.073894 },
   },
   {
     id: "cb-canvasDeuteranomaly",
     label: "Deuteranomaly",
     type: "deutan",
     anomalize: true,
-    blinder: { x: 1.4, y: -0.4, m: 0.968437, yi: 0.003331 },
+    blinder: { x: 1.14, y: -0.14, m: 0.968437, yi: 0.003331 },
   },
   {
     id: "cb-canvasDeuteranopia",
     label: "Deuteranopia",
     type: "deutan",
     anomalize: false,
-    blinder: { x: 1.4, y: -0.4, m: 0.968437, yi: 0.003331 },
+    blinder: { x: 1.14, y: -0.14, m: 0.968437, yi: 0.003331 },
   },
   {
     id: "cb-canvasTritanomaly",
@@ -143,31 +143,20 @@ const fragmentShaderSourceCB = `
   uniform float u_gamma;
   varying vec2 v_texCoord;
 
+  // GLSL mat3 is column-major: each row below is a COLUMN of the math matrix,
+  // so these are the transposed literals of engine.js's row-major matrices.
+  // This makes "matrix * vec" produce the correct result.
   const mat3 matrixRgbXyz = mat3(
-    0.4306, 0.3416, 0.1783,
-    0.2220, 0.7067, 0.0713,
-    0.0202, 0.1296, 0.9392
+    0.4306, 0.2220, 0.0202,
+    0.3416, 0.7067, 0.1296,
+    0.1783, 0.0713, 0.9392
   );
   const mat3 matrixXyzRgb = mat3(
-    3.0632, -1.3933, -0.4758,
-    -0.9692, 1.8760, 0.0416,
-    0.0679, -0.2289, 1.0693
+    3.0632, -0.9692, 0.0679,
+    -1.3933, 1.8760, -0.2289,
+    -0.4758, 0.0416, 1.0693
   );
 
-  vec3 toLinear(vec3 c) {
-    vec3 linear;
-    linear.r = (c.r <= 0.04045) ? c.r / 12.92 : pow((c.r + 0.055)/1.055, 2.4);
-    linear.g = (c.g <= 0.04045) ? c.g / 12.92 : pow((c.g + 0.055)/1.055, 2.4);
-    linear.b = (c.b <= 0.04045) ? c.b / 12.92 : pow((c.b + 0.055)/1.055, 2.4);
-    return linear;
-  }
-  vec3 toSrgb(vec3 c) {
-    vec3 srgb;
-    srgb.r = (c.r <= 0.0031308) ? 12.92 * c.r : 1.055 * pow(c.r, 1.0/2.4) - 0.055;
-    srgb.g = (c.g <= 0.0031308) ? 12.92 * c.g : 1.055 * pow(c.g, 1.0/2.4) - 0.055;
-    srgb.b = (c.b <= 0.0031308) ? 12.92 * c.b : 1.055 * pow(c.b, 1.0/2.4) - 0.055;
-    return srgb;
-  }
   vec3 rgbToXyz(vec3 c) {
     return matrixRgbXyz * c;
   }
@@ -180,10 +169,12 @@ const fragmentShaderSourceCB = `
     vec4 texColor = texture2D(u_image, v_texCoord);
     vec3 c = pow(texColor.rgb, vec3(u_gamma));
     if(u_achroma) {
-      float gray = dot(c, vec3(0.212656, 0.715158, 0.072186));
+      // monochrome_code: luminance in display/sRGB space, no gamma round-trip
+      float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
       vec3 result = vec3(gray);
       if(u_anomalize) {
-        result = (1.75 * result + c) / 2.75;
+        // achromatomaly (anommo): weight 4 against the original pixel
+        result = (4.0 * result + texColor.rgb) / 5.0;
       }
       gl_FragColor = vec4(result, texColor.a);
       return;
@@ -206,14 +197,8 @@ const fragmentShaderSourceCB = `
     float ngz = 0.358271 * xyy.z / 0.329016;
     float dX = ngx - simX;
     float dZ = ngz - simZ;
-    vec3 dRGB;
-    dRGB.r = dX * matrixXyzRgb[0][0] + dZ * matrixXyzRgb[0][2];
-    dRGB.g = dX * matrixXyzRgb[1][0] + dZ * matrixXyzRgb[1][2];
-    dRGB.b = dX * matrixXyzRgb[2][0] + dZ * matrixXyzRgb[2][2];
-    vec3 simRGB;
-    simRGB.r = simX * matrixXyzRgb[0][0] + simY * matrixXyzRgb[0][1] + simZ * matrixXyzRgb[0][2];
-    simRGB.g = simX * matrixXyzRgb[1][0] + simY * matrixXyzRgb[1][1] + simZ * matrixXyzRgb[1][2];
-    simRGB.b = simX * matrixXyzRgb[2][0] + simY * matrixXyzRgb[2][1] + simZ * matrixXyzRgb[2][2];
+    vec3 dRGB = matrixXyzRgb * vec3(dX, 0.0, dZ);
+    vec3 simRGB = matrixXyzRgb * vec3(simX, simY, simZ);
     float _r = (dRGB.r != 0.0) ? ((simRGB.r < 0.0 ? 0.0 : 1.0) - simRGB.r) / dRGB.r : 0.0;
     float _g = (dRGB.g != 0.0) ? ((simRGB.g < 0.0 ? 0.0 : 1.0) - simRGB.g) / dRGB.g : 0.0;
     float _b = (dRGB.b != 0.0) ? ((simRGB.b < 0.0 ? 0.0 : 1.0) - simRGB.b) / dRGB.b : 0.0;
@@ -225,7 +210,8 @@ const fragmentShaderSourceCB = `
     simRGB = clamp(simRGB, 0.0, 1.0);
     simRGB = pow(simRGB, vec3(1.0/u_gamma));
     if(u_anomalize) {
-      simRGB = (1.75 * simRGB + c) / 2.75;
+      // anomalize in display/sRGB space against the original pixel (engine.js anomylize_code)
+      simRGB = (1.75 * simRGB + texColor.rgb) / 2.75;
     }
     gl_FragColor = vec4(clamp(simRGB, 0.0, 1.0), texColor.a);
   }
